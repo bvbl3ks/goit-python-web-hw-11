@@ -1,47 +1,78 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import date, timedelta
+
 from database import get_db
 from models import Contact
-from schemas import ContactCreate, ContactRead, ContactUpdate
-from routers.auth import get_current_user
+from schemas import ContactCreate, ContactRead
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
-@router.post("/", response_model=ContactRead, status_code=status.HTTP_201_CREATED)
-def create_contact(contact: ContactCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    db_contact = Contact(**contact.model_dump(), owner_id=user.id)
+
+@router.post("/", response_model=ContactRead)
+def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
+    db_contact = Contact(**contact.dict())
     db.add(db_contact)
     db.commit()
     db.refresh(db_contact)
     return db_contact
 
+
 @router.get("/", response_model=list[ContactRead])
-def read_contacts(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return db.query(Contact).filter(Contact.owner_id == user.id).all()
+def read_contacts(search: str | None = None, db: Session = Depends(get_db)):
+    query = db.query(Contact)
+    if search:
+        query = query.filter(
+            (Contact.first_name.ilike(f"%{search}%")) |
+            (Contact.last_name.ilike(f"%{search}%")) |
+            (Contact.email.ilike(f"%{search}%"))
+        )
+    return query.all()
+
 
 @router.get("/{contact_id}", response_model=ContactRead)
-def read_contact(contact_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    contact = db.query(Contact).filter(Contact.id == contact_id, Contact.owner_id == user.id).first()
+def read_contact(contact_id: int, db: Session = Depends(get_db)):
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
-        raise HTTPException(status_code=404, detail="Contact not found")
+        raise HTTPException(status_code=404, detail="Not found")
     return contact
 
+
 @router.put("/{contact_id}", response_model=ContactRead)
-def update_contact(contact_id: int, contact: ContactUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    db_contact = db.query(Contact).filter(Contact.id == contact_id, Contact.owner_id == user.id).first()
+def update_contact(contact_id: int, contact: ContactCreate, db: Session = Depends(get_db)):
+    db_contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not db_contact:
-        raise HTTPException(status_code=404, detail="Contact not found")
-    for key, value in contact.model_dump(exclude_unset=True).items():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    for key, value in contact.dict().items():
         setattr(db_contact, key, value)
+
     db.commit()
     db.refresh(db_contact)
     return db_contact
 
-@router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_contact(contact_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    db_contact = db.query(Contact).filter(Contact.id == contact_id, Contact.owner_id == user.id).first()
-    if not db_contact:
-        raise HTTPException(status_code=404, detail="Contact not found")
-    db.delete(db_contact)
+
+@router.delete("/{contact_id}")
+def delete_contact(contact_id: int, db: Session = Depends(get_db)):
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    db.delete(contact)
     db.commit()
-    return
+    return {"detail": "Deleted"}
+
+
+@router.get("/birthdays/", response_model=list[ContactRead])
+def upcoming_birthdays(db: Session = Depends(get_db)):
+    today = date.today()
+    next_week = today + timedelta(days=7)
+
+    result = []
+    for c in db.query(Contact).all():
+        if c.birthday:
+            bday = c.birthday.replace(year=today.year)
+            if today <= bday <= next_week:
+                result.append(c)
+
+    return result
