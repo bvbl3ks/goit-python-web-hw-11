@@ -1,41 +1,17 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
 from datetime import date
+from typing import Optional
 
-# ---------------- USERS ----------------
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-
-class UserRead(BaseModel):
-    id: int
-    email: EmailStr
-
-    class Config:
-        from_attributes = True  # Pydantic v2 вместо orm_mode
-
-# ---------------- CONTACTS ----------------
-class ContactBase(BaseModel):
+class ContactCreate(BaseModel):
     first_name: str
     last_name: str
     email: EmailStr
     phone: str
-    birthday: Optional[date] = None
+    birthday: date
     extra: Optional[str] = None
 
-class ContactCreate(ContactBase):
-    pass
-
-class ContactRead(ContactBase):
+class ContactRead(ContactCreate):
     id: int
 
     class Config:
-        from_attributes = True
-
-class ContactUpdate(BaseModel):
-    first_name: Optional[str]
-    last_name: Optional[str]
-    email: Optional[EmailStr]
-    phone: Optional[str]
-    birthday: Optional[date]
-    extra: Optional[str]
+        from_attributes = True 
