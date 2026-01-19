@@ -1,11 +1,12 @@
 from fastapi import FastAPI
-from routers import contacts, auth
+from database import engine, Base
+from routers import contacts
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-
-app.include_router(auth.router)
 app.include_router(contacts.router)
 
 @app.get("/")
 def root():
-    return {"message": "REST API Contacts with Auth"}
+    return {"message": "Contacts API"}
