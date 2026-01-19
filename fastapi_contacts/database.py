@@ -1,18 +1,11 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.orm import sessionmaker
+from models import Base
 
 DATABASE_URL = "sqlite:///./contacts.db"
 
-engine = create_engine(
-    DATABASE_URL, connect_args={"check_same_thread": False}
-)
-
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-class Base(DeclarativeBase):
-    pass
-
 
 def get_db():
     db = SessionLocal()
@@ -20,3 +13,6 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# Создание таблиц
+Base.metadata.create_all(bind=engine)
